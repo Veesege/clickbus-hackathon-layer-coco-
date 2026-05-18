@@ -56,6 +56,12 @@ function updateLog(id, status, summary, data = null, error = null) {
   ).changes;
 }
 
+function getLog(id) {
+  const r = db.prepare('SELECT * FROM logs WHERE id = ?').get(id);
+  if (!r) return null;
+  return { ...r, data: r.data ? JSON.parse(r.data) : null, tags: r.tags ? JSON.parse(r.tags) : [] };
+}
+
 function getLogs({ status, type, tag, limit = 100, offset = 0, errorOnly = false } = {}) {
   let q = 'SELECT * FROM logs';
   const params = [];
@@ -93,4 +99,4 @@ function saveNote(id, notes) {
   return db.prepare("UPDATE logs SET notes = ? WHERE id = ?").run(notes, id).changes;
 }
 
-module.exports = { log, updateLog, getLogs, markReviewed, countPending, getTagCounts, saveNote };
+module.exports = { log, updateLog, getLog, getLogs, markReviewed, countPending, getTagCounts, saveNote };

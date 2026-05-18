@@ -31,7 +31,7 @@ async function getTicketPDF(ticketId) {
       });
       if (!dlRes.ok) throw new Error(`PDF download ${dlRes.status}`);
       const buffer = Buffer.from(await dlRes.arrayBuffer());
-      return { buffer, filename: pdf.file_name };
+      return { buffer, url: pdf.content_url, filename: pdf.file_name };
     }
   }
   return null;
@@ -64,14 +64,9 @@ async function updateZendeskTicket(ticketId, bwRef, passengerName) {
   }
 }
 
-async function processAndApproveTicket(ticketId) {
-  const logId = db.log(
-    'clickbus',
-    `Ticket #${ticketId} — procesando…`,
-    { ticketId },
-    null,
-    ['clickbus']
-  );
+// Fase 1: parsear PDF + buscar booking → guardar en logs pendiente de aprobación manual
+async function processTicketForReview(ticketId) {
+  const logId = db.log('clickbus', `Ticket #${ticketId} — procesando…`, { ticketId }, null, ['clickbus']);
 
   try {
     const pdfResult = await getTicketPDF(ticketId);
@@ -82,15 +77,13 @@ async function processAndApproveTicket(ticketId) {
 
     const info = await processClickbusTicket(pdfResult.buffer);
 
-    await approveClickbusBooking(info.bookingId, info.bwRef, info.seats, info.passengers, pdfResult.buffer);
-
-    if (!DRY_RUN) {
-      await updateZendeskTicket(ticketId, info.bwRef, info.passengerName);
-    }
-
-    const summary = `${DRY_RUN ? '[DRY] ' : ''}✅ ${info.bwRef} — ${info.passengerName} — Ticket #${ticketId}`;
-    db.updateLog(logId, 'reviewed', summary, { ...info, dry: DRY_RUN }, null);
-    console.log(`[CB] ${summary}`);
+    // Guardar todo incluyendo pdfUrl para re-descargar al aprobar
+    db.updateLog(logId, 'pending',
+      `⏳ ${info.bwRef} — ${info.passengerName} — Ticket #${ticketId}`,
+      { ...info, ticketId, pdfUrl: pdfResult.url },
+      null
+    );
+    console.log(`[CB] Listo para revisar: ${info.bwRef} — ${info.passengerName} — Ticket #${ticketId}`);
 
   } catch (err) {
     console.error(`[CB] Ticket #${ticketId} error:`, err.message);
@@ -102,7 +95,42 @@ async function processAndApproveTicket(ticketId) {
 app.post('/api/clickbus/trigger', (req, res) => {
   const { ticket_id } = req.body;
   res.json({ ok: true });
-  if (ticket_id) processAndApproveTicket(String(ticket_id)).catch(console.error);
+  if (ticket_id) processTicketForReview(String(ticket_id)).catch(console.error);
+});
+
+// Fase 2: aprobación manual desde la web de logs
+app.post('/api/clickbus/approve/:logId', async (req, res) => {
+  const logEntry = db.getLog(+req.params.logId);
+  if (!logEntry || !logEntry.data) return res.status(404).json({ error: 'log not found' });
+
+  const { bookingId, bwRef, seats, passengers, pdfUrl, passengerName, ticketId } = logEntry.data;
+
+  try {
+    const dlRes = await fetch(pdfUrl, { headers: { Authorization: `Basic ${ZENDESK_AUTH}` } });
+    if (!dlRes.ok) throw new Error(`PDF re-download ${dlRes.status}`);
+    const buffer = Buffer.from(await dlRes.arrayBuffer());
+
+    await approveClickbusBooking(bookingId, bwRef, seats, passengers, buffer);
+
+    if (!DRY_RUN && ticketId) {
+      await updateZendeskTicket(ticketId, bwRef, passengerName);
+    }
+
+    const summary = `${DRY_RUN ? '[DRY] ' : ''}✅ ${bwRef} — ${passengerName} — Ticket #${ticketId}`;
+    db.updateLog(logEntry.id, 'reviewed', summary, { ...logEntry.data, dry: DRY_RUN }, null);
+    console.log(`[CB] Aprobado manualmente: ${summary}`);
+
+    res.json({ ok: true, bwRef, summary });
+
+  } catch (err) {
+    console.error(`[CB] Approve error:`, err.message);
+    db.updateLog(logEntry.id, 'pending',
+      `❌ Error aprobando ${bwRef}: ${err.message}`,
+      logEntry.data,
+      err.message
+    );
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/logs', (req, res) => {

@@ -131,6 +131,18 @@
       background: #1a3a1a; color: #4ade80; transition: all 0.15s;
     }
     .review-btn:hover { background: #153015; }
+    .approve-btn {
+      padding: 7px 18px; border-radius: 5px; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif;
+      background: #1e3a5f; color: #60a5fa; transition: all 0.15s;
+    }
+    .approve-btn:hover:not(:disabled) { background: #1a3356; }
+    .approve-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .approve-meta {
+      font-size: 12px; color: #555; margin-top: 8px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .approve-meta span { font-family: monospace; color: #777; }
 
     .empty { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
     .chevron { font-size: 10px; color: #444; flex-shrink: 0; transition: transform 0.2s; }
@@ -195,6 +207,17 @@
     else                         badge = '<span class="badge-reviewed">✓ Reviewed</span>';
 
     const hasData = !!(log.data || log.error);
+    const isClickbusReady = log.type === 'clickbus' && log.data?.bookingId && isPending;
+
+    const approveMetaHtml = isClickbusReady ? `
+      <div class="approve-meta">
+        <span>BW: ${log.data.bwRef || '—'}</span>
+        <span>Pax: ${log.data.passengerName || '—'}</span>
+        <span>Ruta: ${log.data.route || '—'}</span>
+        <span>Fecha: ${log.data.date || '—'}</span>
+        <span>Asientos: ${(log.data.seats || []).join(', ') || '—'}</span>
+      </div>
+    ` : '';
 
     card.innerHTML = `
       <div class="log-header">
@@ -206,14 +229,22 @@
         <span class="log-ts">${formatTs(log.timestamp)}</span>
       </div>
       <div class="log-body">
+        ${approveMetaHtml}
         ${hasData ? `
-          <div class="details-toggle"><span class="dt-arrow">▶</span> Detalles</div>
+          <div class="details-toggle"><span class="dt-arrow">▶</span> Detalles JSON</div>
           <div class="log-data-wrap">
             ${log.data ? `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : ''}
             ${isError ? `<div class="log-error-box">Error: ${log.error}</div>` : ''}
           </div>
         ` : ''}
-        ${isPending ? `<div class="log-actions"><button class="review-btn" data-id="${log.id}">Mark as reviewed</button></div>` : ''}
+        ${isPending ? `
+          <div class="log-actions">
+            ${isClickbusReady
+              ? `<button class="approve-btn" data-id="${log.id}">✓ Approve booking</button>`
+              : `<button class="review-btn" data-id="${log.id}">Mark as reviewed</button>`
+            }
+          </div>
+        ` : ''}
       </div>
     `;
 
@@ -240,6 +271,30 @@
         loadLogs();
       });
     }
+
+    const approveBtn = card.querySelector('.approve-btn');
+    if (approveBtn) {
+      approveBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        approveBtn.disabled = true;
+        approveBtn.textContent = 'Aprobando…';
+        try {
+          const res = await fetch(`/api/clickbus/approve/${log.id}`, { method: 'POST' });
+          const data = await res.json();
+          if (data.ok) {
+            approveBtn.textContent = '✅ Aprobado';
+            setTimeout(() => { card.remove(); loadLogs(); }, 1200);
+          } else {
+            approveBtn.textContent = '❌ Error — reintentar';
+            approveBtn.disabled = false;
+          }
+        } catch {
+          approveBtn.textContent = '❌ Error — reintentar';
+          approveBtn.disabled = false;
+        }
+      });
+    }
+
     return card;
   }
 
