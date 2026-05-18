@@ -1,0 +1,17 @@
+{
+  "name": "clickbus-agent",
+  "version": "1.0.0",
+  "description": "Autonomous Clickbus ticket processor for Bookaway",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.19.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clickbus Agent — Logs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #1a1a1a; color: #ececec; min-height: 100vh; }
+
+    header {
+      width: 100%; padding: 13px 24px;
+      display: flex; align-items: center; gap: 16px;
+      background: #1e1e1e; border-bottom: 1px solid #2a2a2a;
+    }
+    header h1 { font-size: 16px; font-weight: 600; color: #e0e0e0; letter-spacing: -0.2px; }
+    .pending-badge {
+      background: #f97316; color: #fff;
+      font-size: 11px; font-weight: 600;
+      padding: 1px 6px; border-radius: 10px; margin-left: 8px;
+    }
+    .dry-badge {
+      font-size: 11px; font-weight: 600; color: #f97316;
+      background: #2a1a00; padding: 2px 8px; border-radius: 5px; margin-left: auto;
+    }
+
+    .main { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
+
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+    .tab-btn {
+      padding: 7px 18px; border-radius: 6px; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 500; font-family: 'Inter', sans-serif;
+      background: #2a2a2a; color: #888; transition: all 0.15s;
+    }
+    .tab-btn:hover { color: #ccc; background: #333; }
+    .tab-btn.active { background: #3a3a3a; color: #e0e0e0; }
+
+    .filters { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 5px 12px; border-radius: 5px; border: 1px solid #333; cursor: pointer;
+      font-size: 12px; font-weight: 500; font-family: 'Inter', sans-serif;
+      background: transparent; color: #666; transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: #555; color: #aaa; }
+    .filter-btn.active { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
+
+    .section { margin-bottom: 6px; border: 1px solid #2a2a2a; border-radius: 8px; overflow: hidden; }
+    .section-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; cursor: pointer; user-select: none;
+      background: #222; transition: background 0.15s;
+    }
+    .section-header:hover { background: #252525; }
+    .section-header.open { background: #262626; border-bottom: 1px solid #2a2a2a; }
+    .section-title { font-size: 13px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.6px; }
+    .section-count {
+      font-size: 11px; font-weight: 600; background: #2e2e2e; color: #666;
+      padding: 1px 7px; border-radius: 10px;
+    }
+    .section-chevron { font-size: 10px; color: #444; margin-left: auto; transition: transform 0.2s; }
+    .section-chevron.open { transform: rotate(90deg); }
+    .section-body { display: flex; flex-direction: column; gap: 0; }
+    .section-body.collapsed { display: none; }
+    .section-body .log-card { border-radius: 0; border-left: none; border-right: none; border-top: none; border-bottom: 1px solid #252525; }
+    .section-body .log-card:last-child { border-bottom: none; }
+
+    .log-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .log-card {
+      background: #222; border: 1px solid #2e2e2e; border-radius: 7px;
+      overflow: hidden; transition: border-color 0.15s;
+    }
+    .log-card:hover { border-color: #3a3a3a; }
+    .log-card.error   { border-left: 3px solid #ef4444 !important; }
+    .log-card.pending-card  { border-left: 3px solid #f97316 !important; }
+    .log-card.reviewed-card { border-left: 3px solid #22c55e !important; }
+
+    .log-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; cursor: pointer; user-select: none;
+    }
+    .log-type {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;
+    }
+    .type-clickbus { background: #1e3a5f; color: #60a5fa; }
+
+    .log-summary { font-size: 13px; color: #ccc; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .log-tags { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: nowrap; }
+    .log-tag { font-size: 10px; background: #252525; color: #555; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+
+    .badge-pending      { font-size: 10px; color: #f97316; font-weight: 600; flex-shrink: 0; }
+    .badge-reviewed     { font-size: 10px; color: #22c55e; font-weight: 600; flex-shrink: 0; }
+    .badge-error        { font-size: 10px; color: #ef4444; font-weight: 600; flex-shrink: 0; }
+    .badge-error-solved { font-size: 10px; color: #666; font-weight: 600; flex-shrink: 0; }
+
+    .log-ts { font-size: 11px; color: #444; flex-shrink: 0; }
+
+    .log-body { padding: 0 12px 12px; display: none; }
+    .log-body.open { display: block; }
+
+    .details-toggle {
+      font-size: 11px; color: #555; cursor: pointer; margin-bottom: 6px;
+      display: inline-flex; align-items: center; gap: 4px; user-select: none;
+      padding: 3px 0;
+    }
+    .details-toggle:hover { color: #888; }
+    .details-toggle .dt-arrow { transition: transform 0.15s; }
+    .details-toggle.open .dt-arrow { transform: rotate(90deg); }
+    .log-data-wrap { display: none; }
+    .log-data-wrap.open { display: block; margin-bottom: 8px; }
+
+    .log-data {
+      background: #1a1a1a; border-radius: 6px; padding: 10px 12px;
+      font-size: 12px; font-family: 'Menlo', 'Consolas', monospace;
+      color: #aaa; white-space: pre-wrap; word-break: break-all;
+      max-height: 280px; overflow-y: auto;
+    }
+    .log-error-box {
+      margin-bottom: 8px; background: #2a1515; border-radius: 6px; padding: 8px 12px;
+      font-size: 12px; color: #f87171; font-family: monospace;
+    }
+
+    .log-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+    .review-btn {
+      padding: 6px 14px; border-radius: 5px; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 500; font-family: 'Inter', sans-serif;
+      background: #1a3a1a; color: #4ade80; transition: all 0.15s;
+    }
+    .review-btn:hover { background: #153015; }
+
+    .empty { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
+    .chevron { font-size: 10px; color: #444; flex-shrink: 0; transition: transform 0.2s; }
+    .chevron.open { transform: rotate(90deg); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚌 Clickbus Agent</h1>
+  <span class="pending-badge" id="nav-pending" style="display:none">0</span>
+  <span class="dry-badge" id="dry-badge" style="display:none">DRY RUN</span>
+</header>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="pending">Needs Review</button>
+    <button class="tab-btn" data-tab="all">History</button>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-type="" data-tag="" data-error="">All</button>
+    <button class="filter-btn" data-type="" data-tag="" data-error="1">Errors</button>
+  </div>
+
+  <div id="log-list"><div class="empty">Loading...</div></div>
+</div>
+
+<script>
+  let currentTab = 'pending';
+  let currentType = '';
+  let currentTag  = '';
+  let currentErrorOnly = false;
+  let openSectionEl = null;
+
+  function formatTs(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) +
+           ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderLog(log) {
+    const card = document.createElement('div');
+    const isReviewed = log.status === 'reviewed';
+    const isError    = !!log.error;
+    const isPending  = log.status === 'pending';
+
+    card.className = 'log-card' +
+      (isError && isPending ? ' error pending-card' : '') +
+      (isError && isReviewed ? ' error reviewed-card' : '') +
+      (!isError && isPending ? ' pending-card' : '') +
+      (!isError && isReviewed ? ' reviewed-card' : '');
+
+    const tagsHtml = (log.tags || []).slice(0, 3).map(t =>
+      `<span class="log-tag">${t.replace(/_/g,' ')}</span>`
+    ).join('');
+
+    let badge = '';
+    if (isError && isPending)   badge = '<span class="badge-error">Error</span>';
+    else if (isError)            badge = '<span class="badge-error-solved">Error · Solved</span>';
+    else if (isPending)          badge = '<span class="badge-pending">Pending</span>';
+    else                         badge = '<span class="badge-reviewed">✓ Reviewed</span>';
+
+    const hasData = !!(log.data || log.error);
+
+    card.innerHTML = `
+      <div class="log-header">
+        <span class="chevron">▶</span>
+        <span class="log-type type-${log.type}">${log.type}</span>
+        <span class="log-summary">${log.summary}</span>
+        <span class="log-tags">${tagsHtml}</span>
+        ${badge}
+        <span class="log-ts">${formatTs(log.timestamp)}</span>
+      </div>
+      <div class="log-body">
+        ${hasData ? `
+          <div class="details-toggle"><span class="dt-arrow">▶</span> Detalles</div>
+          <div class="log-data-wrap">
+            ${log.data ? `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : ''}
+            ${isError ? `<div class="log-error-box">Error: ${log.error}</div>` : ''}
+          </div>
+        ` : ''}
+        ${isPending ? `<div class="log-actions"><button class="review-btn" data-id="${log.id}">Mark as reviewed</button></div>` : ''}
+      </div>
+    `;
+
+    card.querySelector('.log-header').addEventListener('click', () => {
+      card.querySelector('.log-body').classList.toggle('open');
+      card.querySelector('.chevron').classList.toggle('open');
+    });
+
+    const detailsToggle = card.querySelector('.details-toggle');
+    if (detailsToggle) {
+      detailsToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        detailsToggle.classList.toggle('open');
+        card.querySelector('.log-data-wrap').classList.toggle('open');
+      });
+    }
+
+    const reviewBtn = card.querySelector('.review-btn');
+    if (reviewBtn) {
+      reviewBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await fetch(`/api/logs/${log.id}/review`, { method: 'POST' });
+        card.remove();
+        loadLogs();
+      });
+    }
+    return card;
+  }
+
+  function openSection(header, body, chevron) {
+    if (openSectionEl && openSectionEl !== body) {
+      openSectionEl.classList.add('collapsed');
+      openSectionEl.previousSibling?.classList.remove('open');
+      openSectionEl.previousSibling?.querySelector('.section-chevron')?.classList.remove('open');
+    }
+    const isOpen = !body.classList.contains('collapsed');
+    if (isOpen) {
+      body.classList.add('collapsed');
+      header.classList.remove('open');
+      chevron.classList.remove('open');
+      openSectionEl = null;
+    } else {
+      body.classList.remove('collapsed');
+      header.classList.add('open');
+      chevron.classList.add('open');
+      openSectionEl = body;
+    }
+  }
+
+  function renderSection(title, logs, startOpen = false) {
+    const section = document.createElement('div');
+    section.className = 'section';
+    const chevron = document.createElement('span');
+    chevron.className = 'section-chevron' + (startOpen ? ' open' : '');
+    chevron.textContent = '▶';
+    const header = document.createElement('div');
+    header.className = 'section-header' + (startOpen ? ' open' : '');
+    header.innerHTML = `<span class="section-title">${title}</span><span class="section-count">${logs.length}</span>`;
+    header.appendChild(chevron);
+    const body = document.createElement('div');
+    body.className = 'section-body' + (startOpen ? '' : ' collapsed');
+    logs.forEach(log => body.appendChild(renderLog(log)));
+    if (startOpen) openSectionEl = body;
+    header.addEventListener('click', () => openSection(header, body, chevron));
+    section.appendChild(header);
+    section.appendChild(body);
+    return section;
+  }
+
+  function renderHistory(logs) {
+    const container = document.getElementById('log-list');
+    container.innerHTML = '';
+    openSectionEl = null;
+    if (!logs.length) { container.innerHTML = '<div class="empty">No history yet.</div>'; return; }
+    const groups = {};
+    logs.forEach(log => {
+      const key = (log.tags && log.tags.length > 0) ? log.tags[0] : 'clickbus';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(log);
+    });
+    Object.entries(groups)
+      .sort((a, b) => b[1].length - a[1].length)
+      .forEach(([tag, items], i) => {
+        const title = tag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        container.appendChild(renderSection(title, items, i === 0));
+      });
+  }
+
+  async function loadLogs() {
+    const isPending = currentTab === 'pending';
+    const params = new URLSearchParams({ limit: 300 });
+    if (isPending)        params.set('status', 'pending');
+    if (currentType)      params.set('type', currentType);
+    if (currentTag)       params.set('tag', currentTag);
+    if (currentErrorOnly) params.set('error_only', '1');
+
+    const res = await fetch(`/api/logs?${params}`);
+    const { logs, pending, tagCounts } = await res.json();
+
+    const badge = document.getElementById('nav-pending');
+    badge.textContent = pending;
+    badge.style.display = pending > 0 ? '' : 'none';
+
+    document.getElementById('filters').style.display = isPending ? 'flex' : 'none';
+
+    if (isPending) {
+      const container = document.getElementById('log-list');
+      container.innerHTML = '';
+      if (!logs.length) { container.innerHTML = '<div class="empty">Nothing to review.</div>'; return; }
+      logs.forEach(log => container.appendChild(renderLog(log)));
+    } else {
+      renderHistory(logs);
+    }
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTab = btn.dataset.tab;
+      currentType = ''; currentTag = ''; currentErrorOnly = false;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.filter-btn[data-type=""]')?.classList.add('active');
+      loadLogs();
+    });
+  });
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentType = btn.dataset.type || '';
+      currentTag = '';
+      currentErrorOnly = btn.dataset.error === '1';
+      loadLogs();
+    });
+  });
+
+  // Mostrar badge DRY RUN si algún log tiene dry:true en data
+  async function checkDryRun() {
+    const res = await fetch('/api/logs?limit=1&type=clickbus');
+    const { logs } = await res.json();
+    if (logs[0]?.data?.dry) {
+      document.getElementById('dry-badge').style.display = '';
+    }
+  }
+
+  loadLogs();
+  checkDryRun();
+  setInterval(loadLogs, 30000);
+</script>
+</body>
+</html>
