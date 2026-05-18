@@ -102,6 +102,7 @@ app.post('/api/clickbus/trigger', (req, res) => {
 app.post('/api/clickbus/approve/:logId', async (req, res) => {
   const logEntry = db.getLog(+req.params.logId);
   if (!logEntry || !logEntry.data) return res.status(404).json({ error: 'log not found' });
+  if (logEntry.status === 'reviewed') return res.status(409).json({ error: 'already approved' });
 
   const { bookingId, bwRef, seats, passengers, pdfUrl, passengerName, ticketId } = logEntry.data;
 
