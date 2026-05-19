@@ -16,6 +16,9 @@
       background: #1e1e1e; border-bottom: 1px solid #2a2a2a;
     }
     header h1 { font-size: 16px; font-weight: 600; color: #e0e0e0; letter-spacing: -0.2px; }
+    .header-sub { font-size: 11px; color: #555; font-weight: 400; margin-left: 2px; }
+    .header-team { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .header-team span { font-size: 11px; color: #555; font-weight: 500; }
     .pending-badge {
       background: #f97316; color: #fff;
       font-size: 11px; font-weight: 600;
@@ -94,8 +97,11 @@
 
     .badge-pending      { font-size: 10px; color: #f97316; font-weight: 600; flex-shrink: 0; }
     .badge-reviewed     { font-size: 10px; color: #22c55e; font-weight: 600; flex-shrink: 0; }
+    .badge-dismissed    { font-size: 10px; color: #555;    font-weight: 600; flex-shrink: 0; }
     .badge-error        { font-size: 10px; color: #ef4444; font-weight: 600; flex-shrink: 0; }
-    .badge-error-solved { font-size: 10px; color: #666; font-weight: 600; flex-shrink: 0; }
+    .badge-error-solved { font-size: 10px; color: #666;    font-weight: 600; flex-shrink: 0; }
+    .badge-rt           { font-size: 10px; color: #a78bfa; font-weight: 600; background: #1e1535; padding: 1px 6px; border-radius: 4px; flex-shrink: 0; }
+    .waiting-note       { font-size: 12px; color: #666; margin-top: 10px; font-style: italic; }
 
     .log-ts { font-size: 11px; color: #444; flex-shrink: 0; }
 
@@ -138,6 +144,12 @@
     }
     .approve-btn:hover:not(:disabled) { background: #1a3356; }
     .approve-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .dismiss-btn {
+      padding: 7px 14px; border-radius: 5px; cursor: pointer;
+      font-size: 12px; font-weight: 500; font-family: 'Inter', sans-serif;
+      background: transparent; border: 1px solid #333; color: #555; transition: all 0.15s;
+    }
+    .dismiss-btn:hover { border-color: #555; color: #888; }
     .approve-meta {
       font-size: 12px; color: #555; margin-top: 8px;
       display: flex; flex-direction: column; gap: 3px;
@@ -153,8 +165,13 @@
 
 <header>
   <h1>🚌 Clickbus Agent</h1>
+  <span class="header-sub">layer of Coco</span>
   <span class="pending-badge" id="nav-pending" style="display:none">0</span>
   <span class="dry-badge" id="dry-badge" style="display:none">DRY RUN</span>
+  <div class="header-team">
+    <span>Valentino Garcia</span>
+    <span>Belissa Diaz</span>
+  </div>
 </header>
 
 <div class="main">
@@ -200,24 +217,55 @@
       `<span class="log-tag">${t.replace(/_/g,' ')}</span>`
     ).join('');
 
+    const isDismissed        = log.status === 'dismissed';
+    const isRT               = !!(log.data?.roundTrip || log.data?.isRoundTrip);
+    const hasData            = !!(log.data || log.error);
+    const isRoundTripWaiting = log.type === 'clickbus' && log.data?.waitingCompanion === true && isPending;
+    const isRoundTripReady   = log.type === 'clickbus' && log.data?.roundTrip && !log.data?.waitingCompanion && isPending;
+    const isAutoApproved     = isPending && log.summary?.startsWith('✅');
+    const isClickbusRetry    = log.type === 'clickbus' && log.data?.bookingId && isPending && !!log.error && !isRoundTripWaiting;
+    const isClickbusReady    = isClickbusRetry;
+
     let badge = '';
-    if (isError && isPending)   badge = '<span class="badge-error">Error</span>';
-    else if (isError)            badge = '<span class="badge-error-solved">Error · Solved</span>';
-    else if (isPending)          badge = '<span class="badge-pending">Pending</span>';
-    else                         badge = '<span class="badge-reviewed">✓ Reviewed</span>';
+    if (isError && isPending)    badge = '<span class="badge-error">Error</span>';
+    else if (isError)             badge = '<span class="badge-error-solved">Error · Solved</span>';
+    else if (isRoundTripWaiting)  badge = '<span class="badge-rt">↔ Waiting</span>';
+    else if (isRT && isPending)   badge = '<span class="badge-rt">↔ Round Trip</span>';
+    else if (isRT)                badge = '<span class="badge-rt">↔ Round Trip</span>';
+    else if (isPending)           badge = '<span class="badge-pending">Pending</span>';
+    else if (isDismissed)         badge = '<span class="badge-dismissed">Dismissed</span>';
+    else                          badge = '<span class="badge-reviewed">✓ Reviewed</span>';
 
-    const hasData = !!(log.data || log.error);
-    const isClickbusReady = log.type === 'clickbus' && log.data?.bookingId && isPending;
-
-    const approveMetaHtml = isClickbusReady ? `
-      <div class="approve-meta">
-        <span>BW: ${log.data.bwRef || '—'}</span>
-        <span>Pax: ${log.data.passengerName || '—'}</span>
-        <span>Ruta: ${log.data.route || '—'}</span>
-        <span>Fecha: ${log.data.date || '—'}</span>
-        <span>Asientos: ${(log.data.seats || []).join(', ') || '—'}</span>
-      </div>
-    ` : '';
+    let approveMetaHtml = '';
+    if (isRoundTripWaiting) {
+      approveMetaHtml = `
+        <div class="approve-meta">
+          <span>BW: ${log.data.bwRef || '—'}</span>
+          <span>Pax: ${log.data.passengerName || '—'}</span>
+          <span>Route: ${log.data.route || '—'}</span>
+          <span>Leg: ${log.data.leg || '—'}</span>
+        </div>
+      `;
+    } else if (isRoundTripReady) {
+      approveMetaHtml = `
+        <div class="approve-meta">
+          <span>BW: ${log.data.bwRef || '—'}</span>
+          <span>Pax: ${log.data.passengerName || '—'}</span>
+          <span style="margin-top:4px;color:#a78bfa">Outbound trip — Zendesk #${log.data.departureTicketId || '—'} · Seats: ${(log.data.departureSeats || []).join(', ') || '—'}</span>
+          <span style="color:#a78bfa">Return trip — Zendesk #${log.data.returnTicketId || '—'} · Seats: ${(log.data.returnSeats || []).join(', ') || '—'}</span>
+        </div>
+      `;
+    } else if (isClickbusReady) {
+      approveMetaHtml = `
+        <div class="approve-meta">
+          <span>BW: ${log.data.bwRef || '—'}</span>
+          <span>Pax: ${log.data.passengerName || '—'}</span>
+          <span>Route: ${log.data.route || '—'}</span>
+          <span>Date: ${log.data.date || '—'}</span>
+          <span>Seats: ${(log.data.seats || []).join(', ') || '—'}</span>
+        </div>
+      `;
+    }
 
     card.innerHTML = `
       <div class="log-header">
@@ -231,7 +279,7 @@
       <div class="log-body">
         ${approveMetaHtml}
         ${hasData ? `
-          <div class="details-toggle"><span class="dt-arrow">▶</span> Detalles JSON</div>
+          <div class="details-toggle"><span class="dt-arrow">▶</span> JSON Details</div>
           <div class="log-data-wrap">
             ${log.data ? `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : ''}
             ${isError ? `<div class="log-error-box">Error: ${log.error}</div>` : ''}
@@ -239,10 +287,13 @@
         ` : ''}
         ${isPending ? `
           <div class="log-actions">
-            ${isClickbusReady
-              ? `<button class="approve-btn" data-id="${log.id}">✓ Approve booking</button>`
-              : `<button class="review-btn" data-id="${log.id}">Mark as reviewed</button>`
+            ${isRoundTripWaiting
+              ? `<p class="waiting-note">⏳ Waiting for companion leg PDF…</p>`
+              : isClickbusReady
+                ? `<button class="approve-btn" data-id="${log.id}">↺ Retry approve</button>`
+                : `<button class="review-btn" data-id="${log.id}">Mark as reviewed</button>`
             }
+            ${!isRoundTripWaiting && !isAutoApproved ? `<button class="dismiss-btn" data-id="${log.id}">Dismiss</button>` : ''}
           </div>
         ` : ''}
       </div>
@@ -272,12 +323,24 @@
       });
     }
 
+    const dismissBtn = card.querySelector('.dismiss-btn');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        dismissBtn.disabled = true;
+        dismissBtn.textContent = '…';
+        await fetch(`/api/logs/${log.id}/dismiss`, { method: 'POST' });
+        card.remove();
+        loadLogs();
+      });
+    }
+
     const approveBtn = card.querySelector('.approve-btn');
     if (approveBtn) {
       approveBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         approveBtn.disabled = true;
-        approveBtn.textContent = 'Aprobando…';
+        approveBtn.textContent = 'Approving…';
         try {
           const res = await fetch(`/api/clickbus/approve/${log.id}`, { method: 'POST' });
           const data = await res.json();
@@ -285,10 +348,11 @@
             approveBtn.textContent = '✅ Aprobado';
             setTimeout(() => { card.remove(); loadLogs(); }, 1200);
           } else {
-            approveBtn.textContent = '❌ Error — reintentar';
+            approveBtn.textContent = '❌ ' + (data.error || 'Error');
             approveBtn.disabled = false;
+            if (data.error?.includes('reset to pending')) setTimeout(() => loadLogs(), 800);
           }
-        } catch {
+        } catch (err) {
           approveBtn.textContent = '❌ Error — reintentar';
           approveBtn.disabled = false;
         }
@@ -343,24 +407,19 @@
     container.innerHTML = '';
     openSectionEl = null;
     if (!logs.length) { container.innerHTML = '<div class="empty">No history yet.</div>'; return; }
-    const groups = {};
-    logs.forEach(log => {
-      const key = (log.tags && log.tags.length > 0) ? log.tags[0] : 'clickbus';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(log);
-    });
-    Object.entries(groups)
-      .sort((a, b) => b[1].length - a[1].length)
-      .forEach(([tag, items], i) => {
-        const title = tag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        container.appendChild(renderSection(title, items, i === 0));
-      });
+    const approved   = logs.filter(l => l.status === 'reviewed' && !l.error);
+    const errors     = logs.filter(l => l.status === 'reviewed' && !!l.error);
+    const dismissed  = logs.filter(l => l.status === 'dismissed');
+    if (approved.length)  container.appendChild(renderSection('✅ Approved', approved, true));
+    if (errors.length)    container.appendChild(renderSection('❌ Errors', errors, !approved.length));
+    if (dismissed.length) container.appendChild(renderSection('— Dismissed', dismissed, !approved.length && !errors.length));
   }
 
   async function loadLogs() {
     const isPending = currentTab === 'pending';
     const params = new URLSearchParams({ limit: 300 });
     if (isPending)        params.set('status', 'pending');
+    else                  params.set('status', 'history');
     if (currentType)      params.set('type', currentType);
     if (currentTag)       params.set('tag', currentTag);
     if (currentErrorOnly) params.set('error_only', '1');
@@ -374,10 +433,11 @@
 
     document.getElementById('filters').style.display = isPending ? 'flex' : 'none';
 
+    const container = document.getElementById('log-list');
+    container.innerHTML = '';
+
     if (isPending) {
-      const container = document.getElementById('log-list');
-      container.innerHTML = '';
-      if (!logs.length) { container.innerHTML = '<div class="empty">Nothing to review.</div>'; return; }
+      if (!logs.length) { container.innerHTML = '<div class="empty">Nothing crazy going on here, just chilling 🧘</div>'; return; }
       logs.forEach(log => container.appendChild(renderLog(log)));
     } else {
       renderHistory(logs);
