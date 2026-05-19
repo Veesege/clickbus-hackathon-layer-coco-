@@ -267,3 +267,27 @@ Create a Zendesk trigger with:
 - **Condition:** Tag contains `clickbus` (or desired condition)
 - **Action:** Webhook → `POST https://<your-cloudflare-tunnel-url>/api/clickbus/trigger`
 - **Body:** `{"ticket_id": "{{ticket.id}}"}`
+
+---
+
+## Manual Trigger (Live Demo / Testing)
+
+If the automatic webhook didn't fire, or you want to demonstrate the agent live, pick any unresolved Clickbus ticket from the Zendesk view and trigger it manually:
+
+1. Open the ticket in Zendesk and grab the ID from the URL:
+   ```
+   https://bookaway.zendesk.com/agent/tickets/12345
+                                                ^^^^^
+                                             this is the ticket_id
+   ```
+
+2. Run this command in a terminal (server must be running):
+   ```bash
+   curl -X POST https://<your-cloudflare-tunnel-url>/api/clickbus/trigger \
+     -H "Content-Type: application/json" \
+     -d '{"ticket_id": "12345"}'
+   ```
+
+3. Watch the dashboard at `/` — the ticket will appear in **Needs Review** within seconds, either auto-approved or pending manual action.
+
+> Perfect for live demos: pick any open Clickbus ticket, paste its ID, and show the full pipeline running in real time.
