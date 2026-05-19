@@ -82,8 +82,8 @@ Both Zendesk tickets closed simultaneously
 | Database | SQLite via `better-sqlite3` |
 | Auth | Custom HMAC-SHA256 signed session cookie |
 | Environment | `dotenv` |
-| Deployment | Fly.io (via `fly.toml` + GitHub Actions) |
-| CI/CD | GitHub Actions → `fly deploy` on push to `master` |
+| Deployment | Local server + Cloudflare Tunnel (`cloudflared`) |
+| Public URL | Cloudflare Tunnel exposes `localhost:3000` to the internet |
 
 ---
 
@@ -147,9 +147,7 @@ Both Zendesk tickets closed simultaneously
 
 ### Database
 
-SQLite file at:
-- **Development:** `./logs.db` (project root)
-- **Production (Fly.io):** `/data/logs.db` (persistent volume)
+SQLite file at `./logs.db` in the project root.
 
 ### Schema
 
@@ -249,13 +247,17 @@ npm install
 npm start
 ```
 
-### Deploy to Fly.io
+The server starts on `http://localhost:3000`.
+
+### Expose publicly with Cloudflare Tunnel
 
 ```bash
-fly deploy
+cloudflared tunnel --url http://127.0.0.1:3000
 ```
 
-CI/CD automatically deploys on push to `master` via `.github/workflows/fly-deploy.yml`.
+Cloudflare prints a public URL like `https://some-words.trycloudflare.com` — use that URL in your Zendesk webhook.
+
+> For a stable permanent URL, set up a named tunnel with a custom domain in your Cloudflare dashboard instead of using the ephemeral quick-tunnel.
 
 ---
 
@@ -263,5 +265,5 @@ CI/CD automatically deploys on push to `master` via `.github/workflows/fly-deplo
 
 Create a Zendesk trigger with:
 - **Condition:** Tag contains `clickbus` (or desired condition)
-- **Action:** Webhook → `POST https://<your-app>.fly.dev/api/clickbus/trigger`
+- **Action:** Webhook → `POST https://<your-cloudflare-tunnel-url>/api/clickbus/trigger`
 - **Body:** `{"ticket_id": "{{ticket.id}}"}`
