@@ -240,21 +240,21 @@ DASHBOARD_PASS=          # Dashboard login password
 SESSION_SECRET=          # Long random string for cookie signing
 ```
 
-### Run locally
+### Starting the app
 
+Open **two terminals**:
+
+**Terminal 1 — server:**
 ```bash
-npm install
-npm start
+cd C:\Coco\clickbus-agent
+node server.js
 ```
+Should print: `Clickbus Agent running on :3000`
 
-The server starts on `http://localhost:3000`.
-
-### Expose publicly with Cloudflare Tunnel
-
+**Terminal 2 — tunnel (new terminal with +):**
 ```bash
 cloudflared tunnel --url http://127.0.0.1:3000
 ```
-
 Cloudflare prints a public URL like `https://some-words.trycloudflare.com` — use that URL in your Zendesk webhook.
 
 > For a stable permanent URL, set up a named tunnel with a custom domain in your Cloudflare dashboard instead of using the ephemeral quick-tunnel.
