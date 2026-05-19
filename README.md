@@ -272,7 +272,9 @@ Create a Zendesk trigger with:
 
 ## Manual Trigger (Live Demo / Testing)
 
-If the automatic webhook didn't fire, or you want to demonstrate the agent live, pick any unresolved Clickbus ticket from the Zendesk view and trigger it manually:
+If the automatic webhook didn't fire, or you want to demonstrate the agent live, you can trigger any unresolved Clickbus ticket by giving its ID directly to Claude Code in the terminal — no need to run any command yourself.
+
+### How to do it
 
 1. Open the ticket in Zendesk and grab the ID from the URL:
    ```
@@ -281,13 +283,27 @@ If the automatic webhook didn't fire, or you want to demonstrate the agent live,
                                              this is the ticket_id
    ```
 
-2. Run this command in a terminal (server must be running):
-   ```bash
-   curl -X POST https://<your-cloudflare-tunnel-url>/api/clickbus/trigger \
-     -H "Content-Type: application/json" \
-     -d '{"ticket_id": "12345"}'
-   ```
+2. Tell Claude Code in the terminal: **"trigger ticket 12345"** — Claude fires the request for you.
 
-3. Watch the dashboard at `/` — the ticket will appear in **Needs Review** within seconds, either auto-approved or pending manual action.
+3. The agent runs the full pipeline automatically:
+   - Downloads the PDF from Zendesk
+   - Claude Haiku extracts passenger name, seats, date, route
+   - Searches and scores matching bookings in Bookaway Admin
+   - Uploads the PDF and approves the booking
+   - Closes the Zendesk ticket with the BW reference
 
-> Perfect for live demos: pick any open Clickbus ticket, paste its ID, and show the full pipeline running in real time.
+### What you'll see in the dashboard
+
+```
+Auto-approved  →  appears in "Needs Review" with ✅ summary
+                         │
+                         ▼
+               Agent clicks "Mark as reviewed"
+                         │
+                         ▼
+               Moves to History as ✅ Approved
+```
+
+If the agent couldn't match the booking automatically, it lands in **Needs Review** with an error — the agent can then click **"Retry approve"** to approve it manually with one click.
+
+> Perfect for live demos: pick any open Clickbus ticket from the Zendesk view, say the ID out loud, and the full pipeline runs in real time — from PDF to approved booking to closed ticket.
