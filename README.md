@@ -304,4 +304,4 @@ Auto-approved  →  appears in "Needs Review" with ✅ summary
 
 If the agent couldn't match the booking automatically, it lands in **Needs Review** with an error — the agent can then click **"Retry approve"** to approve it manually with one click.
 
-> Perfect for live demos: pick any open Clickbus ticket from the Zendesk view, say the ID out loud, and the full pipeline runs in real time — from PDF to approved booking to closed ticket.
+> Perfect for live demos: pick any open Clickbus ticket from the Zendesk view, say the ID out loud, and the full pipeline runs in real time — from PDF to approved booking to closed ticket. If you dont find any zendesk tickets in that moment, you can slack me and we can create a test. Valen
