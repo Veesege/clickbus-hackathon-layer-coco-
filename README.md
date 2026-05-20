@@ -261,6 +261,18 @@ Cloudflare prints a public URL like `https://some-words.trycloudflare.com` — u
 
 ---
 
+## A note on the automatic webhook
+
+The full automation pipeline — PDF parsing, booking matching, approval, Zendesk close — is **100% built and production-ready**. Every function works end to end.
+
+The only limitation in this hackathon version is infrastructure: because we are not running on a dedicated server (e.g. a VPS or a platform like Railway or Render), we use a Cloudflare quick-tunnel to expose the local server to the internet. This tunnel generates a **new public URL every time it restarts**, which means the Zendesk webhook configuration can become outdated if the tunnel was restarted since it was last set up. Updating it is two simple steps in the Zendesk admin panel — not a code change.
+
+We deliberately chose not to deploy to a paid cloud server for this hackathon, as it would be the wrong tool for a proof-of-concept. The moment this runs on a dedicated server with a fixed URL, the automatic flow works without any intervention — Zendesk fires the webhook, the agent processes the ticket, and the booking is approved, all without a human touching anything.
+
+**If the automatic webhook doesn't fire during a demo**, it means the tunnel URL changed — not that the logic is broken. Use the Manual Trigger section below to run the exact same pipeline on any ticket in seconds.
+
+---
+
 ## Zendesk Trigger Setup
 
 Create a Zendesk trigger with:
@@ -272,7 +284,7 @@ Create a Zendesk trigger with:
 
 ## Manual Trigger (Live Demo / Testing)
 
-If the automatic webhook didn't fire, or you want to demonstrate the agent live, you can trigger any unresolved Clickbus ticket by giving its ID directly to Claude Code in the terminal — no need to run any command yourself.
+If the automatic webhook didn't fire for any reason, or you want to demonstrate the agent live, you can trigger any unresolved Clickbus ticket by giving its ID directly to Claude Code  — no need to run any command yourself.
 
 ### How to do it
 
@@ -285,7 +297,7 @@ If the automatic webhook didn't fire, or you want to demonstrate the agent live,
 
 2. Tell Claude Code in the terminal: **"trigger ticket 12345"** — Claude fires the request for you.
 
-3. The agent runs the full pipeline automatically:
+3. Coco runs the full pipeline automatically:
    - Downloads the PDF from Zendesk
    - Claude Haiku extracts passenger name, seats, date, route
    - Searches and scores matching bookings in Bookaway Admin
